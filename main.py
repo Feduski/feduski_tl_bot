@@ -40,13 +40,15 @@ def weather():
 async def check_dollar_update(context: ContextTypes.DEFAULT_TYPE): #should send the message to every chat
     global actual_value
     new_value = ((requests.get('https://api.bluelytics.com.ar/v2/latest')).json())['blue']['value_sell']
-    diff = (actual_value - new_value)* 100 / actual_value
+    yesterday_close = ((requests.get('https://api.bluelytics.com.ar/v2/evolution.json')).json())[3]['value_sell']
+
+    diff = ((new_value - yesterday_close) / yesterday_close) * 100
 
     if new_value > actual_value:
-        await context.bot.send_message(chat_id=chat_id, text=f'The dollar value is up to {new_value}, ({diff})📈')
+        await context.bot.send_message(chat_id=chat_id, text=f'The dollar value is up to {new_value}, ({round(diff,2)}) 24hs📈')
     elif new_value < actual_value:
-        await context.bot.send_message(chat_id=chat_id, text=f'The dollar value is down to {new_value}, ({diff})📉')
-    
+        await context.bot.send_message(chat_id=chat_id, text=f'The dollar value is down to {new_value}, ({round(diff,2)}) 24hs📉')
+
     actual_value = new_value
 
 async def dolar_close(context: CallbackContext):
@@ -57,7 +59,7 @@ async def good_morning(context: CallbackContext):
     dollar = ((requests.get('https://api.bluelytics.com.ar/v2/latest')).json())['blue']['value_sell']
     today = (date.today()).strftime("%B %d, %Y")
     await context.bot.send_message(chat_id=chat_id, text=f"""
-                                   \nGood Morning Sir. 
+                                   \nGood Morning Sir.
                                    \nToday is {today}📅
                                    \n{weather()}
                                    \nThe dollar value is of ${dollar} 💸
@@ -69,7 +71,7 @@ async def start_command(update: Update,context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=update.effective_chat.id, text="Hello Sir, welcome! I can serve you the weather, the dolar value and your favourites cryptocurrencies values.")
     logging.info(f'User: ({update.message.chat.first_name}) executed: start_command.')
 
-async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE): 
+async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=context._user_id ,text='Im alive, check command')
     logging.info(f'User: ({update.message.chat.first_name}) executed: check_command.')
 
@@ -111,6 +113,6 @@ job_minute = job_queue.run_repeating(check_dollar_update, interval=1800, first=1
 buenos_aires_tz = pytz.timezone('America/Argentina/Buenos_Aires')
 
 job_daily = job_queue.run_daily(dolar_close, time=(time(17,00, tzinfo=buenos_aires_tz)), days=(1, 2, 3, 4, 5))
-job_daily = job_queue.run_daily(good_morning, time=(time(15,27, tzinfo=buenos_aires_tz)))
+job_daily = job_queue.run_daily(good_morning, time=(time(9,15, tzinfo=buenos_aires_tz)))
 
 application.run_polling(poll_interval=10.0)
