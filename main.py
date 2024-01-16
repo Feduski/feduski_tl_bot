@@ -20,9 +20,11 @@ logging.basicConfig(
 def error(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     logging.error(f'Update "{update}" caused error {ctx.error}')
 
-data = (requests.get('https://api.bluelytics.com.ar/v2/latest')).json()
-actual_value = data['blue']['value_sell']
+data_usd = (requests.get('https://api.bluelytics.com.ar/v2/latest')).json()
+actual_value_usd = data_usd['blue']['value_sell']
 
+data_btc = requests.get('https://api.coincap.io/v2/assets/bitcoin').json()
+actual_price_btc = round(float(data_btc['data']['priceUsd']), 2)
 #FUNCTIONS
 
 def weather():
@@ -38,18 +40,33 @@ def weather():
 #SCHEDULED MESSAGES
 
 async def check_dollar_update(context: ContextTypes.DEFAULT_TYPE): #should send the message to every chat
-    global actual_value
+    global actual_value_usd
     new_value = ((requests.get('https://api.bluelytics.com.ar/v2/latest')).json())['blue']['value_sell']
     yesterday_close = ((requests.get('https://api.bluelytics.com.ar/v2/evolution.json')).json())[3]['value_sell']
 
     diff = ((new_value - yesterday_close) / yesterday_close) * 100
 
-    if new_value > actual_value:
-        await context.bot.send_message(chat_id=chat_id, text=f'The dollar value is up to {new_value}, ({round(diff,2)}) 24hs📈')
-    elif new_value < actual_value:
-        await context.bot.send_message(chat_id=chat_id, text=f'The dollar value is down to {new_value}, ({round(diff,2)}) 24hs📉')
+    if new_value > actual_value_usd:
+        await context.bot.send_message(chat_id=chat_id, text=f'The dollar value is up to {new_value}, ({round(diff,2)}%) 24hs📈')
+    elif new_value < actual_value_usd:
+        await context.bot.send_message(chat_id=chat_id, text=f'The dollar value is down to {new_value}, ({round(diff,2)}%) 24hs📉')
 
-    actual_value = new_value
+    actual_value_usd = new_value
+
+async def check_crypto_update(context: ContextTypes.DEFAULT_TYPE):
+    global actual_price_btc
+    response = requests.get('https://api.coincap.io/v2/assets/bitcoin').json()
+    change24hr = round(float(response['data']['changePercent24Hr']), 2)
+    new_price = round(float(response['data']['priceUsd']), 2)
+    diff = abs(actual_price_btc - new_price)
+
+    actual_price_btc = new_price
+
+    if change24hr > 3 and diff > 2500:
+        await context.bot.send_message(chat_id=chat_id, text=f'Bitcoin is up to {new_price}, {change24hr}% 24hs📈')
+    elif change24hr < -3 and diff > 2500:
+        await context.bot.send_message(chat_id=chat_id, text=f'Bitcoin is down to {new_price}, {change24hr}% 24hs📉')
+
 
 async def dolar_close(context: CallbackContext):
     close = ((requests.get('https://api.bluelytics.com.ar/v2/latest')).json())['blue']['value_sell']
